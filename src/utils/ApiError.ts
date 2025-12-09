@@ -1,10 +1,15 @@
 // Custom API error class for structured error handling.
+
 class ApiError extends Error {
+  public statusCode: number;
+  public errors: string[];
+  public success: boolean;
+
   constructor(
-    statusCode,
-    message = "Something went wrong",
-    errors = [],
-    stack = "",
+    statusCode: number,
+    message: string = 'Something went wrong',
+    errors: string[] = [],
+    stack: string = '',
   ) {
     super(message); // Call the base Error constructor
 
