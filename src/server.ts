@@ -1,7 +1,7 @@
-import app from './app.ts';
+import expressServer from './app.ts';
 
-const PORT = process.env.PORT || 8000;
+const PORT: number = parseInt(process.env.PORT ?? '8000');
 
-app.listen(PORT, () => {
+expressServer.listen(PORT, () => {
   console.log(`Server started on port ${PORT};\nhttp://localhost:${PORT}`);
 });

@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
-import { usersTable } from './db/schema.ts';
+import { usersTable, type InsertUser, type SelectUser } from './db/schema.ts';
 
 const db = drizzle(process.env.DATABASE_URL!);
 
 async function main() {
-  const user: typeof usersTable.$inferInsert = {
+  const user: InsertUser = {
     name: 'John',
-    age: 30,
     email: 'john@example.com',
+    isNative: false,
   };
 
   await db.insert(usersTable).values(user);
@@ -26,16 +26,16 @@ async function main() {
   }[]
   */
 
-  await db
-    .update(usersTable)
-    .set({
-      age: 31,
-    })
-    .where(eq(usersTable.email, user.email));
-  console.log('User info updated!');
-
-  await db.delete(usersTable).where(eq(usersTable.email, user.email));
-  console.log('User deleted!');
+  // await db
+  //   .update(usersTable)
+  //   .set({
+  //     age: 31,
+  //   })
+  //   .where(eq(usersTable.email, user.email));
+  // console.log('User info updated!');
+  //
+  // await db.delete(usersTable).where(eq(usersTable.email, user.email));
+  // console.log('User deleted!');
 }
 
 main();

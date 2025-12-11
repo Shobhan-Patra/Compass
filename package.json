@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "node --watch --env-file=.env src/server.ts",
     "start": "node src/server.ts",
-    "prepare": "npx husky install"
+    "prepare": "npx husky install",
+    "db:generate": "npx drizzle-kit generate",
+    "db:migrate": "npx drizzle-kit migrate",
+    "db:test": "node src/testQuery.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,13 +17,14 @@
   "packageManager": "pnpm@10.24.0",
   "type": "module",
   "dependencies": {
-    "@clerk/backend": "^2.26.0",
+    "@clerk/express": "^1.7.56",
     "@neondatabase/serverless": "^1.0.2",
-    "@types/express": "^5.0.6",
     "drizzle-orm": "^0.45.0",
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.0",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
     "prettier": "^3.7.4",
