@@ -1,6 +1,6 @@
 import express from 'express';
 import { type Express, type Request, type Response } from 'express';
-import { clerkClient, clerkMiddleware, requireAuth, getAuth } from '@clerk/express';
+import { clerkMiddleware, requireAuth } from '@clerk/express';
 
 const expressServer: Express = express();
 
@@ -12,15 +12,8 @@ expressServer.get('/healthcheck', (_: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
-expressServer.get('/protected', requireAuth(), async (req: Request, res: Response) => {
-  const { userId } = getAuth(req);
-  if (!userId) {
-    throw new Error('Not authenticated');
-  }
-  const user = await clerkClient.users.getUser(userId);
-  return res.json({
-    user: user,
-  });
-});
+import userRouter from './routes/user';
+
+expressServer.use('/userprofile', requireAuth(), userRouter);
 
 export default expressServer;
