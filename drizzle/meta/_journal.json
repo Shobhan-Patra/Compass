@@ -8,6 +8,13 @@
       "when": 1765460071724,
       "tag": "0000_minor_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765532386762,
+      "tag": "0001_lyrical_bastion",
+      "breakpoints": true
     }
   ]
 }

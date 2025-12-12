@@ -1,13 +1,11 @@
 import 'dotenv/config';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { eq } from 'drizzle-orm';
 import { usersTable, type InsertUser, type SelectUser } from './db/schema.ts';
-
-const db = drizzle(process.env.DATABASE_URL!);
+import db from './db/db.ts';
 
 async function main() {
   const user: InsertUser = {
     name: 'John',
+    clerkId: 'user_randomassuser123',
     email: 'john@example.com',
     isNative: false,
   };

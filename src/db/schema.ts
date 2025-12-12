@@ -7,12 +7,14 @@ import {
   text,
   integer,
   unique,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 export const compassSchema = pgSchema('compass');
 
 export const usersTable = compassSchema.table('users', {
   id: serial('id').primaryKey(),
+  clerkId: varchar('clerk_id', { length: 255 }).unique().notNull(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   isNative: boolean('is_native').notNull().default(false),

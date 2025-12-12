@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { getUserProfile } from '../controllers/user.ts';
+import { getUserProfile, syncUser } from '../controllers/user.ts';
 
 const router: Router = Router();
 
-router.get('/', getUserProfile);
+router.post('/sync', syncUser);
+router.get('/profile', getUserProfile);
 
 export default router;

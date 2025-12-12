@@ -8,12 +8,12 @@ expressServer.use(express.json());
 expressServer.use(express.urlencoded({ extended: true }));
 expressServer.use(clerkMiddleware());
 
-expressServer.get('/healthcheck', (_: Request, res: Response) => {
+expressServer.get('/api/v1/healthcheck', (_: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
-import userRouter from './routes/user';
+import userRouter from './routes/user.ts';
 
-expressServer.use('/userprofile', requireAuth(), userRouter);
+expressServer.use('/api/v1/user', requireAuth(), userRouter);
 
 export default expressServer;
