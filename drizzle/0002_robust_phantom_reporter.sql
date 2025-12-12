@@ -1,0 +1,1 @@
+ALTER TABLE "compass"."posts" ADD COLUMN "tag" boolean DEFAULT false NOT NULL;

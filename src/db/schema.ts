@@ -24,7 +24,10 @@ export const postsTable = compassSchema.table('posts', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   content: text('content').notNull(),
+  tag: boolean().notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  isEdited: boolean().default(false),
+  lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: integer('created_by').references(() => usersTable.id),
 });
 

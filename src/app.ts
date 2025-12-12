@@ -8,12 +8,18 @@ expressServer.use(express.json());
 expressServer.use(express.urlencoded({ extended: true }));
 expressServer.use(clerkMiddleware());
 
+expressServer.get('/', (_: Request, res: Response) => {
+  res.status(200).send('This is the landing/signup page,\nYou need to login');
+});
+
 expressServer.get('/api/v1/healthcheck', (_: Request, res: Response) => {
   res.status(200).send('OK');
 });
 
 import userRouter from './routes/user.ts';
+import postRouter from './routes/post.ts';
 
 expressServer.use('/api/v1/user', requireAuth(), userRouter);
+expressServer.use('/api/v1/posts', requireAuth(), postRouter);
 
 export default expressServer;

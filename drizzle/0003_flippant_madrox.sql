@@ -1,0 +1,2 @@
+ALTER TABLE "compass"."posts" ADD COLUMN "isEdited" boolean DEFAULT false;--> statement-breakpoint
+ALTER TABLE "compass"."posts" ADD COLUMN "last_updated_at" timestamp with time zone DEFAULT now() NOT NULL;
