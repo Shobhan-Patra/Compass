@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { usersTable, type InsertUser, type SelectUser } from './db/schema.ts';
+import { usersTable, type InsertUser } from './db/schema.ts';
 import db from './db/db.ts';
 
 async function main() {

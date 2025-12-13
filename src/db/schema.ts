@@ -44,9 +44,7 @@ export const votesTable = compassSchema.table(
     type: text('vote_type', { enum: ['UP', 'DOWN'] }).notNull(),
     votedAt: timestamp('voted_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({
-    voteConstraint: unique('unique_vote_constraint').on(table.postId, table.votedBy),
-  }),
+  (table) => [unique('unique_vote_constraint').on(table.postId, table.votedBy)],
 );
 
 export const recommendationTable = compassSchema.table('recommendations', {
@@ -59,7 +57,4 @@ export const recommendationTable = compassSchema.table('recommendations', {
 });
 
 export type InsertUser = typeof usersTable.$inferInsert;
-export type SelectUser = typeof usersTable.$inferSelect;
-
 export type InsertPost = typeof postsTable.$inferInsert;
-export type SelectPost = typeof postsTable.$inferSelect;

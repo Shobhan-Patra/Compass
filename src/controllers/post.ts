@@ -2,75 +2,67 @@ import { ApiResponse } from '../utils/ApiResponse.ts';
 import { ApiError } from '../utils/ApiError.ts';
 import { asyncHandler } from '../utils/asyncHandler.ts';
 
-import { type Request, type Response } from 'express';
+import { type NextFunction, type Request, type Response } from 'express';
 import { getAuth } from '@clerk/express';
 
 import db from '../db/db.ts';
 import { type InsertPost, postsTable, usersTable } from '../db/schema.ts';
 import { and, eq, sql } from 'drizzle-orm';
 
-const getUserPosts = asyncHandler(async (req: Request, res: Response) => {
-  const { userId } = getAuth(req);
-  if (!userId) {
-    throw new ApiError(401, 'Not authenticated');
-  }
-
-  const localUserResult = await db
-    .select({ localId: usersTable.id })
+// -------Helper function ----------
+async function getLocalUserOrThrow(clerkId: string) {
+  const result = await db
+    .select({ localId: usersTable.id, isNative: usersTable.isNative })
     .from(usersTable)
-    .where(eq(usersTable.clerkId, userId))
+    .where(eq(usersTable.clerkId, clerkId))
     .limit(1);
 
-  const localUserId = localUserResult[0]?.localId;
-  if (!localUserId) {
+  const user = result[0];
+  if (!user) {
     throw new ApiError(404, 'Local userId not found; Sync required');
   }
+  return user;
+}
 
-  const userPostsResult = await db
-    .select({
-      postId: postsTable.id,
-      postTitle: postsTable.title,
-      postContent: postsTable.content,
-      postCreatedAt: postsTable.createdAt,
-    })
+const readPost = asyncHandler(async (req: Request, res: Response) => {
+  const { userId } = getAuth(req);
+  const postId = req.params.postId;
+  if (!userId) throw new ApiError(401, 'Not authenticated');
+  if (!postId) throw new ApiError(400, 'Invalid Post Id');
+
+  const parsedPostId = parseInt(postId);
+  if (isNaN(parsedPostId)) throw new ApiError(403, 'Invalid Post Id provided');
+
+  const postResult = await db
+    .select()
     .from(postsTable)
-    .where(eq(postsTable.createdBy, localUserId));
+    .where(eq(postsTable.id, parsedPostId))
+    .limit(1);
 
-  console.log(userPostsResult);
+  if (postResult.length === 0) {
+    throw new ApiError(404, 'Post not found');
+  }
 
-  return res.status(200).json(new ApiResponse(200, userPostsResult, 'Posts fetched successfully'));
+  return res.status(200).json(new ApiResponse(200, postResult[0], 'Post fetched successfully'));
 });
 
 const createPost = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getAuth(req);
   const { title, content } = req.body;
-  if (!userId) {
-    throw new ApiError(401, 'Not authenticated');
-  }
-  if (!title || !content) {
-    throw new ApiError(400, 'Invalid Post Title or Content');
-  }
+  if (!userId) throw new ApiError(401, 'Not authenticated');
+  if (!title || !content) throw new ApiError(400, 'Invalid Post Title or Content');
 
-  const localUserResult = await db
-    .select({ localId: usersTable.id, isNative: usersTable.isNative })
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId))
-    .limit(1);
-
-  const localUserId = localUserResult[0]?.localId;
-  const isNativeUser = localUserResult[0]?.isNative;
-  if (!localUserId) {
-    throw new ApiError(404, 'Local userId not found; Sync required');
-  }
+  const localUser = await getLocalUserOrThrow(userId);
 
   const newPost: InsertPost = {
     title: title,
     content: content,
-    tag: isNativeUser ?? false,
-    createdBy: localUserId,
+    tag: localUser.isNative ?? false,
+    createdBy: localUser.localId,
   };
 
   const newPostResult = await db.insert(postsTable).values(newPost).returning({
+    id: postsTable.id,
     title: postsTable.title,
     content: postsTable.content,
     tag: postsTable.tag,
@@ -85,17 +77,11 @@ const editPost = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getAuth(req);
   const postId = req.params.postId;
   let { title, content } = req.body;
-  if (!userId) {
-    throw new ApiError(401, 'Not authenticated');
-  }
-  if (!postId) {
-    throw new ApiError(400, 'Invalid Post Id');
-  }
+  if (!userId) throw new ApiError(401, 'Not authenticated');
+  if (!postId) throw new ApiError(400, 'Invalid Post Id');
 
   const parsedPostId = parseInt(postId);
-  if (isNaN(parsedPostId)) {
-    throw new ApiError(403, 'Invalid Post Id provided');
-  }
+  if (isNaN(parsedPostId)) throw new ApiError(403, 'Invalid Post Id provided');
 
   const dataToEdit: any = {};
   if (title) dataToEdit.title = title;
@@ -105,21 +91,12 @@ const editPost = asyncHandler(async (req: Request, res: Response) => {
   }
   dataToEdit.lastUpdatedAt = sql`CURRENT_TIMESTAMP`;
 
-  const localUserResult = await db
-    .select({ localId: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId))
-    .limit(1);
-
-  const localUserId = localUserResult[0]?.localId;
-  if (!localUserId) {
-    throw new ApiError(404, 'Local userId not found; Sync required');
-  }
+  const localUser = await getLocalUserOrThrow(userId);
 
   const editPostResult = await db
     .update(postsTable)
     .set(dataToEdit)
-    .where(and(eq(postsTable.id, parsedPostId), eq(postsTable.createdBy, localUserId)))
+    .where(and(eq(postsTable.id, parsedPostId), eq(postsTable.createdBy, localUser.localId)))
     .returning({
       title: postsTable.title,
       content: postsTable.content,
@@ -128,7 +105,6 @@ const editPost = asyncHandler(async (req: Request, res: Response) => {
       lastUpdatedAt: postsTable.lastUpdatedAt,
     });
 
-  console.log(editPostResult);
   if (editPostResult.length === 0) {
     throw new ApiError(404, 'Post not found or you are not authorized to edit it');
   }
@@ -139,34 +115,48 @@ const editPost = asyncHandler(async (req: Request, res: Response) => {
 const deletePost = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getAuth(req);
   const postId = req.params.postId;
-  if (!userId) {
-    throw new ApiError(401, 'Not authenticated');
-  }
-  if (!postId) {
-    throw new ApiError(400, 'Invalid Post Id');
-  }
+  if (!userId) throw new ApiError(401, 'Not authenticated');
+  if (!postId) throw new ApiError(400, 'Invalid Post Id');
 
-  const localUserResult = await db
-    .select({ localId: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, userId))
-    .limit(1);
+  const parsedPostId = parseInt(postId);
+  if (isNaN(parsedPostId)) throw new ApiError(403, 'Invalid Post Id provided');
 
-  const localUserId = localUserResult[0]?.localId;
-  if (!localUserId) {
-    throw new ApiError(404, 'Local userId not found; Sync required');
-  }
+  const localUser = await getLocalUserOrThrow(userId);
 
   const DeletePostResult = await db
     .delete(postsTable)
-    .where(and(eq(postsTable.id, parseInt(postId)), eq(postsTable.createdBy, localUserId)));
+    .where(and(eq(postsTable.id, parseInt(postId)), eq(postsTable.createdBy, localUser.localId)))
+    .returning({ id: postsTable.id });
 
-  console.log(DeletePostResult);
-  // if (DeletePostResult.length === 0) {
-  //     throw new ApiError(404, 'Post not found or you are not authorized to edit it');
-  // }
+  if (DeletePostResult.length === 0) {
+    throw new ApiError(404, 'Post not found or you are not authorized to edit it');
+  }
 
   return res.status(200).json(new ApiResponse(200, null, 'Post deleted successfully'));
 });
 
-export { getUserPosts, createPost, editPost, deletePost };
+const getAllPostsOfAUser = asyncHandler(async (req: Request, res: Response) => {
+  const { userId: clerkId } = getAuth(req);
+  const userId = req.params.userId;
+  if (!clerkId) throw new ApiError(401, 'Not authenticated');
+  if (!userId) throw new ApiError(400, 'Invalid User Id');
+
+  const parsedUserId = parseInt(userId);
+  if (isNaN(parsedUserId)) throw new ApiError(403, 'Invalid User Id provided');
+
+  const result = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.id, parsedUserId));
+
+  const user = result[0];
+  if (!user) {
+    throw new ApiError(404, 'UserId not found');
+  }
+
+  const postResult = await db.select().from(postsTable).where(eq(postsTable.createdBy, user.id));
+
+  return res.status(200).json(new ApiResponse(200, postResult, 'Posts fetched successfully'));
+});
+
+export { readPost, createPost, editPost, deletePost, getAllPostsOfAUser };

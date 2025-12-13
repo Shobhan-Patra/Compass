@@ -6,7 +6,8 @@ import { type Request, type Response } from 'express';
 import { clerkClient, getAuth, type User } from '@clerk/express';
 
 import db from '../db/db.ts';
-import { usersTable, type InsertUser } from '../db/schema.ts';
+import { usersTable, type InsertUser, postsTable } from '../db/schema.ts';
+import { eq } from 'drizzle-orm';
 
 const syncUser = asyncHandler(async (req: Request, res: Response) => {
   const { userId } = getAuth(req);
@@ -72,4 +73,36 @@ const getUserProfile = asyncHandler(async (req: Request, res: Response) => {
   return res.status(200).json(new ApiResponse(200, userProfile, 'User fetched successfully'));
 });
 
-export { syncUser, getUserProfile };
+const getCurrentUserPosts = asyncHandler(async (req: Request, res: Response) => {
+  const { userId } = getAuth(req);
+  if (!userId) {
+    throw new ApiError(401, 'Not authenticated');
+  }
+
+  const localUserResult = await db
+    .select({ localId: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.clerkId, userId))
+    .limit(1);
+
+  const localUserId: number | undefined = localUserResult[0]?.localId;
+  if (!localUserId) {
+    throw new ApiError(404, 'Local userId not found; Sync required');
+  }
+
+  const userPostsResult = await db
+    .select({
+      postId: postsTable.id,
+      postTitle: postsTable.title,
+      postContent: postsTable.content,
+      postCreatedAt: postsTable.createdAt,
+    })
+    .from(postsTable)
+    .where(eq(postsTable.createdBy, localUserId));
+
+  console.log(userPostsResult);
+
+  return res.status(200).json(new ApiResponse(200, userPostsResult, 'Posts fetched successfully'));
+});
+
+export { syncUser, getUserProfile, getCurrentUserPosts };
