@@ -2,26 +2,29 @@ import { ApiResponse } from '../utils/ApiResponse.ts';
 import { ApiError } from '../utils/ApiError.ts';
 import { asyncHandler } from '../utils/asyncHandler.ts';
 
-import { type NextFunction, type Request, type Response } from 'express';
+import { type Request, type Response } from 'express';
 import { getAuth } from '@clerk/express';
 
 import db from '../db/db.ts';
-import { type InsertPost, postsTable, usersTable } from '../db/schema.ts';
+import { type InsertPost, postsTable, usersTable, votesTable } from '../db/schema.ts';
 import { and, eq, sql } from 'drizzle-orm';
+import { getLocalUserOrThrow } from '../utils/HelperFunctions.ts';
 
-// -------Helper function ----------
-async function getLocalUserOrThrow(clerkId: string) {
-  const result = await db
-    .select({ localId: usersTable.id, isNative: usersTable.isNative })
-    .from(usersTable)
-    .where(eq(usersTable.clerkId, clerkId))
-    .limit(1);
+async function getAllVotesOfPost(postId: number) {
+  if (!postId) throw new ApiError(400, 'Invalid Post Id');
 
-  const user = result[0];
-  if (!user) {
-    throw new ApiError(404, 'Local userId not found; Sync required');
-  }
-  return user;
+  const votes = await db
+    .select({
+      upvoteCount: sql<number>`cast(count(case when ${votesTable.type} = 'UP' then 1 end) as int)`,
+      downvoteCount: sql<number>`cast(count(case when ${votesTable.type} = 'DOWN' then 1 end) as int)`,
+    })
+    .from(votesTable)
+    .where(eq(votesTable.postId, postId));
+
+  const voteData = votes[0] || { upvoteCount: 0, downvoteCount: 0 };
+  console.log(voteData);
+
+  return voteData;
 }
 
 const readPost = asyncHandler(async (req: Request, res: Response) => {
@@ -33,7 +36,7 @@ const readPost = asyncHandler(async (req: Request, res: Response) => {
   const parsedPostId = parseInt(postId);
   if (isNaN(parsedPostId)) throw new ApiError(403, 'Invalid Post Id provided');
 
-  const postResult = await db
+  const postResult: any = await db
     .select()
     .from(postsTable)
     .where(eq(postsTable.id, parsedPostId))
@@ -42,6 +45,10 @@ const readPost = asyncHandler(async (req: Request, res: Response) => {
   if (postResult.length === 0) {
     throw new ApiError(404, 'Post not found');
   }
+
+  const votes = await getAllVotesOfPost(parsedPostId);
+  postResult[0].upvoteCount = votes.upvoteCount;
+  postResult[0].downvoteCount = votes.downvoteCount;
 
   return res.status(200).json(new ApiResponse(200, postResult[0], 'Post fetched successfully'));
 });
@@ -142,7 +149,7 @@ const getAllPostsOfAUser = asyncHandler(async (req: Request, res: Response) => {
   if (!userId) throw new ApiError(400, 'Invalid User Id');
 
   const parsedUserId = parseInt(userId);
-  if (isNaN(parsedUserId)) throw new ApiError(403, 'Invalid User Id provided');
+  if (isNaN(parsedUserId)) throw new ApiError(400, 'Invalid User Id provided');
 
   const result = await db
     .select({ id: usersTable.id })
@@ -156,7 +163,20 @@ const getAllPostsOfAUser = asyncHandler(async (req: Request, res: Response) => {
 
   const postResult = await db.select().from(postsTable).where(eq(postsTable.createdBy, user.id));
 
-  return res.status(200).json(new ApiResponse(200, postResult, 'Posts fetched successfully'));
+  // Appends vote counts to each individual post
+  const postsWithVotes = await Promise.all(
+    postResult.map(async (post: any) => {
+      const parsedPostId = parseInt(post.id);
+      const votes = await getAllVotesOfPost(parsedPostId);
+      return {
+        ...post,
+        upvoteCount: votes.upvoteCount,
+        downvoteCount: votes.downvoteCount,
+      };
+    }),
+  );
+
+  return res.status(200).json(new ApiResponse(200, postsWithVotes, 'Posts fetched successfully'));
 });
 
 export { readPost, createPost, editPost, deletePost, getAllPostsOfAUser };

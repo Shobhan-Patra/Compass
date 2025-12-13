@@ -18,8 +18,10 @@ expressServer.get('/api/v1/healthcheck', (_: Request, res: Response) => {
 
 import userRouter from './routes/user.ts';
 import postRouter from './routes/post.ts';
+import voteRouter from './routes/vote.ts';
 
 expressServer.use('/api/v1/user', requireAuth(), userRouter);
 expressServer.use('/api/v1/posts', requireAuth(), postRouter);
+expressServer.use('/api/v1/vote/', requireAuth(), voteRouter);
 
 export default expressServer;
